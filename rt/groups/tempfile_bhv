@@ -1,0 +1,210 @@
+void BVH::rebuildIndex()
+    {
+    		printf("DEBUG //printfS: Entry to rebuildIndex\n");
+
+            ROOT = new BVHNode();//BVHNode *ROOT = new BVHNode();
+            ROOT->prims = prims;
+
+            ////printff("DEBUG //printfS: Created large BBOX \n \t NOW callling buildTree\n");
+            buildTree(ROOT);
+            printf("DEBUG //printfS: buidTree returned\n");
+
+            return;
+    }
+    void BVH::buildTree(BVHNode * root)	//Recurssive , pass BVHNode object with root->prims[] filled
+    //void BVH::rebuildIndex()
+	{
+		//This function is called at the end, it is safe to assume that prims is populated as needed by now
+                //BVHNode * root = new BVHNode();		//create empty root/node/bbox to start filling up with primitives
+		////printff("DEBUG //printfS: Entry to Recurssive buildTree\n");
+
+		int start = 0;
+        Primitive *p ;
+        int end = root->prims.size() -1;
+		//int numElements = localPrims.size();
+
+        int numElements = root->prims.size(); //end - start;
+        
+		if (numElements <= 0)
+			return;	//return root??
+		if (numElements <= 3)
+		{
+                        root->isLeaf = true;
+			for (int i = start; i <= end; i++)
+			{	
+                                root->numChildren++;
+                                p = root->prims[i];
+                                root->extend(p->getBounds());	
+                                ////printff("DEBUG //printfS: buildTree: Adding p and expanding box\n");	//inflate bbox container to contain all children
+			}
+			////printff("DEBUG //printfS: buildTree: Added %d, %d children to this LEAF node\n",root->numChildren, root->prims.size());
+			return;
+		}
+
+		if (numElements > 3)
+		{
+			////printff("DEBUG //printfS: numElements > 3\n");
+
+            root->isLeaf = false;
+            root->leftChild = new BVHNode();
+            root->leftChild->parent = root;
+            root->rightChild = new BVHNode();
+            root->rightChild->parent = root;
+            
+            //workaround to stop hooking of empty BBox to Origin.
+            root->boundingBox =prims[0]->getBounds();		
+            root->numChildren++;
+			
+
+
+
+
+			for (int i = start+1; i <= end; i++)
+			{	
+                                p = root->prims[i];
+                                root->numChildren++;
+                                root->extend(p->getBounds());		//inflate bbox container to contain all children
+			}
+			////printff("DEBUG //printfS: buildTree: Added %d , %d children to this BRANCH\n",root->numChildren, root->prims.size());
+            int dim_index = splitBox(root->boundingBox);
+            ////printff("DEBUG //printfS: MAX(%f,%f,%f), 		min(%f,%f,%f)\n",root->boundingBox.max.x,root->boundingBox.max.y,root->boundingBox.max.z,root->boundingBox.min.x,root->boundingBox.min.y,root->boundingBox.min.z);
+
+            ////printff("DEBUG //printfS: Splitting parent BBox\n");
+
+			//populating local prims list for Left and Right subtree
+			//seperation of the prims happen based of their relative distance to the centroid/dividing plane on the parent BBox
+
+			switch (dim_index)
+			{
+				case 0:			//x
+					for (int i = start; i <= end; i++)
+					{	
+	                    p = root->prims[i];
+                        if (p->getBounds().centroidOfBBox().x < root->boundingBox.centroidOfBBox().x) 
+                        {	
+                            root->leftChild->prims.push_back(p);
+                            ////printff("DEBUG //printfS: 		...child passes to xleft................\n");
+                            ////printff("					(%f,%f,%f) | (%f,%f, %f)\n",p->getBounds().centroidOfBBox().x,p->getBounds().centroidOfBBox().y,p->getBounds().centroidOfBBox().z,root->boundingBox.centroidOfBBox().x,root->boundingBox.centroidOfBBox().y,root->boundingBox.centroidOfBBox().z);
+                            ////printff("DEBUG //printfS: 		MAX(%f,%f,%f), 		min(%f,%f,%f)\n",p->getBounds().max.x,p->getBounds().max.y,p->getBounds().max.z,p->getBounds().min.x,p->getBounds().min.y,p->getBounds().min.z);
+
+
+                            if(std::abs(p->getBounds().max.x - p->getBounds().min.x) == std::abs(root->boundingBox.max.x - root->boundingBox.min.x)  ) {
+                        			std::swap(root->leftChild->prims.front(), root->leftChild->prims.back());
+                        			//p->isCausingRecurssion = true;
+                        			////printff("Problematic primitve detected in left subtree, rotating to the front of the list");
+                        	}
+                            
+                        }	
+                        
+						else {
+                            root->rightChild->prims.push_back(p);
+                            //printff("DEBUG //printfS: .									.............child passes to xright...\n");
+                            //printff("									(%f,%f,%f) | (%f,%f, %f)\n",root->boundingBox.centroidOfBBox().x,root->boundingBox.centroidOfBBox().y,root->boundingBox.centroidOfBBox().z,p->getBounds().centroidOfBBox().x,p->getBounds().centroidOfBBox().y,p->getBounds().centroidOfBBox().z);
+                            //printff("DEBUG //printfS: 		MAX(%f,%f,%f), 		min(%f,%f,%f)\n",p->getBounds().max.x,p->getBounds().max.y,p->getBounds().max.z,p->getBounds().min.x,p->getBounds().min.y,p->getBounds().min.z);
+
+
+                            if(std::abs(p->getBounds().max.x - p->getBounds().min.x) == std::abs(root->boundingBox.max.x - root->boundingBox.min.x)  ) {
+                        			std::swap(root->rightChild->prims.front(), root->rightChild->prims.back());
+                        			//p->isCausingRecurssion = true;
+                        			//printff("Problematic primitve detected in right subtree, rotating to the front of the list");
+                        	}
+						}
+					}
+					break;
+				case 1:			//y
+					for (int i = start; i <= end; i++)
+					{	
+                        p = root->prims[i];
+                        if (p->getBounds().centroidOfBBox().y < root->boundingBox.centroidOfBBox().y ||  std::abs(p->getBounds().max.y - p->getBounds().min.y) == std::abs(root->boundingBox.max.y - root->boundingBox.min.y)  ) {
+                            root->leftChild->prims.push_back(p);
+                            //printff("DEBUG //printfS: 		...child passes to yleft...............\n");
+                            //printff("					(%f,%f,%f) | (%f,%f, %f)\n",p->getBounds().centroidOfBBox().x,p->getBounds().centroidOfBBox().y,p->getBounds().centroidOfBBox().z,root->boundingBox.centroidOfBBox().x,root->boundingBox.centroidOfBBox().y,root->boundingBox.centroidOfBBox().z);
+                            //printff("DEBUG //printfS: 		MAX(%f,%f,%f), 		min(%f,%f,%f)\n",p->getBounds().max.x,p->getBounds().max.y,p->getBounds().max.z,p->getBounds().min.x,p->getBounds().min.y,p->getBounds().min.z);
+
+                            if(std::abs(p->getBounds().max.y - p->getBounds().min.y) == std::abs(root->boundingBox.max.y - root->boundingBox.min.y)  ) {
+                        			std::swap(root->leftChild->prims.front(), root->leftChild->prims.back());
+                        			//p->isCausingRecurssion = true;
+                        			//printff("Problematic primitve detected in left subtree, rotating to the front of the list");
+                        	}
+                        }
+						else{
+                            root->rightChild->prims.push_back(p);
+                            //printff("DEBUG //printfS: 									..............child passes to yright...\n");
+                            //printff("									(%f,%f,%f) | (%f,%f, %f)\n",root->boundingBox.centroidOfBBox().x,root->boundingBox.centroidOfBBox().y,root->boundingBox.centroidOfBBox().z,p->getBounds().centroidOfBBox().x,p->getBounds().centroidOfBBox().y,p->getBounds().centroidOfBBox().z);
+                            //printff("DEBUG //printfS: 		MAX(%f,%f,%f), 		min(%f,%f,%f)\n",p->getBounds().max.x,p->getBounds().max.y,p->getBounds().max.z,p->getBounds().min.x,p->getBounds().min.y,p->getBounds().min.z);
+
+                            if(std::abs(p->getBounds().max.y - p->getBounds().min.y) == std::abs(root->boundingBox.max.y - root->boundingBox.min.y)  ) {
+                        			std::swap(root->rightChild->prims.front(), root->rightChild->prims.back());
+                        			//p->isCausingRecurssion = true;
+                        			//printff("Problematic primitve detected in right subtree, rotating to the front of the list");
+							}
+						}
+					}
+					break;
+				case 2:			//z
+					for (int i = start; i <= end; i++)
+					{	
+                        p = root->prims[i];
+                        if (p->getBounds().centroidOfBBox().z < root->boundingBox.centroidOfBBox().z ||  std::abs(p->getBounds().max.z - p->getBounds().min.z) == std::abs(root->boundingBox.max.z - root->boundingBox.min.z)  ) {
+                        	//printff("DEBUG //printfS: 		...child passes to zleft..............\n");
+                            root->leftChild->prims.push_back(p);
+                            //printff("					(%f,%f,%f) | (%f,%f, %f)\n",p->getBounds().centroidOfBBox().x,p->getBounds().centroidOfBBox().y,p->getBounds().centroidOfBBox().z,root->boundingBox.centroidOfBBox().x,root->boundingBox.centroidOfBBox().y,root->boundingBox.centroidOfBBox().z);
+                            //printff("DEBUG //printfS: 		MAX(%f,%f,%f), 		min(%f,%f,%f)\n",p->getBounds().max.x,p->getBounds().max.y,p->getBounds().max.z,p->getBounds().min.x,p->getBounds().min.y,p->getBounds().min.z);
+
+                            if(std::abs(p->getBounds().max.z - p->getBounds().min.z) == std::abs(root->boundingBox.max.z - root->boundingBox.min.z)  ) {
+                        			std::swap(root->leftChild->prims.front(), root->leftChild->prims.back());
+                        			//p->isCausingRecurssion = true;
+                        			//printff("Problematic primitve detected in left subtree, rotating to the front of the list");
+                        	}
+                        }
+						else{
+                            root->rightChild->prims.push_back(p);
+                            //printff("DEBUG //printfS: 									.............child passes to zright...\n");
+                            //printff("									(%f,%f,%f) | (%f,%f, %f)\n",root->boundingBox.centroidOfBBox().x,root->boundingBox.centroidOfBBox().y,root->boundingBox.centroidOfBBox().z,p->getBounds().centroidOfBBox().x,p->getBounds().centroidOfBBox().y,p->getBounds().centroidOfBBox().z);
+                            //printff("DEBUG //printfS: 		MAX(%f,%f,%f), 		min(%f,%f,%f)\n",p->getBounds().max.x,p->getBounds().max.y,p->getBounds().max.z,p->getBounds().min.x,p->getBounds().min.y,p->getBounds().min.z);
+
+                            if(std::abs(p->getBounds().max.y - p->getBounds().min.y) == std::abs(root->boundingBox.max.y - root->boundingBox.min.y)  ) {
+                        			std::swap(root->rightChild->prims.front(), root->rightChild->prims.back());
+                        			//p->isCausingRecurssion = true;
+                        			//printff("Problematic primitve detected in right subtree, rotating to the front of the list");
+                        	}
+						}
+                     }
+                     break;			
+			}
+
+			/**Recurssion handle
+			if (left.prims.size  ==0) we detect a problem child in this node and expect recurssion in the next nodes
+			pick up first child from right.prims and push it to left
+
+			**/
+
+			if (root->leftChild->prims.size() == 0)
+			{
+				//printff("Empty left subtree, hit recurssion. \n Moving problematic child to leaf");
+				root->leftChild->prims.push_back(root->rightChild->prims[0]);
+				root->rightChild->prims.erase(root->rightChild->prims.begin());
+			}
+
+			else if(root->rightChild->prims.size() == 0)
+			{
+				//printff("Empty right subtree, hit recurssion. \n Moving problematic child to leaf");
+				root->rightChild->prims.push_back(root->leftChild->prims[0]); 
+				root->leftChild->prims.erase(root->leftChild->prims.begin());
+			}
+
+
+			//printff("DEBUG //printfS: Splitting BBOX successful, %d children passed over Left child\n",root->leftChild->prims.size());
+            buildTree(root->leftChild);
+
+            //printff("DEBUG //printfS: Left child successful, %d children  over Right child\n", root->rightChild->prims.size());
+            buildTree(root->rightChild);
+			//printff("DEBUG //printfS: return to parent\n");
+			return;
+
+			//std::sort(prims, )aaah
+		}
+
+
+		
+	}
